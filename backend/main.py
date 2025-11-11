@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import List
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
@@ -8,9 +9,16 @@ from backend.schemas.chat import ChatHistoryEntry, ChatResponse, ChatRequest
 from backend.gemini.gemini import call_gemini_api
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv(dotenv_path='../.env.local')
+# Load .env.local located in the project root (two levels up from this file path
+# depending on layout). We resolve the path relative to this file so the dotenv
+# load works regardless of current working directory when the app starts.
+dotenv_path = Path(__file__).resolve().parents[1] / '.env.local'
+load_dotenv(dotenv_path=dotenv_path)
 
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyD_-Y_cqi8IXPQcjln3RUjrvdjje5zmItY")
+# Helpful debug: print where we looked for the env file and whether it exists.
+print(f"Loading env from: {dotenv_path} (exists={dotenv_path.exists()})")
+
+API_KEY = os.environ.get("GEMINI_API_KEY")
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent"
 
 
