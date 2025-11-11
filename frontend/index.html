@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gemini Chat</title>
+  <style>
+    :root{
+      --bg:#0f1720;
+      --panel:#111827;
+      --user:#0ea5a4;
+      --bot:#111827;
+      --muted:#94a3b8;
+      --accent:#6366f1;
+      --message-bg-user: linear-gradient(135deg,#059669,#10b981);
+      --message-bg-bot:#1f2937;
+      color-scheme: dark;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:var(--bg); color:#e6eef8}
+    .app{max-width:900px;margin:24px auto 24px;padding:16px;display:flex;flex-direction:column;height:calc(100vh - 48px)}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    header h1{font-size:20px;margin:0}
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    .chat-panel{flex:1;display:flex;flex-direction:column;border-radius:12px;padding:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 6px 18px rgba(2,6,23,0.6);overflow:hidden}
+
+    .messages{flex:1;overflow:auto;padding:8px 4px;display:flex;flex-direction:column;gap:10px}
+
+    .message{max-width:78%;padding:12px;border-radius:12px;line-height:1.4;white-space:pre-wrap}
+    .message.user{align-self:flex-end;background:var(--message-bg-user);color:#082524;border-bottom-right-radius:6px;border-bottom-left-radius:12px}
+    .message.bot{align-self:flex-start;background:var(--message-bg-bot);color:#e6eef8;border-bottom-right-radius:12px;border-bottom-left-radius:6px}
+
+    .meta{font-size:12px;color:var(--muted);margin-top:6px}
+
+    .composer{display:flex;gap:8px;padding:10px 6px;border-top:1px solid rgba(255,255,255,0.02);align-items:center}
+    .composer textarea{flex:1;min-height:44px;max-height:140px;border-radius:10px;padding:10px;background:#0b1220;border:1px solid rgba(255,255,255,0.03);color:inherit;resize:none;font-size:15px}
+    .composer button{background:var(--accent);color:white;border:none;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+    .composer button:disabled{opacity:0.6;cursor:not-allowed}
+
+    .controls{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .controls input[type=text]{background:#061224;border:1px solid rgba(255,255,255,0.03);color:inherit;padding:8px 10px;border-radius:8px}
+
+    footer{font-size:13px;color:var(--muted);text-align:center;margin-top:8px}
+
+    @media (max-width:640px){.app{padding:8px;height:100vh}.chat-panel{padding:8px}.message{max-width:92%}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>Gemini Chat</h1>
+        <p>Simple chat UI — communicates with your FastAPI backend.</p>
+      </div>
+    </header>
+
+    <div class="chat-panel">
+      <!-- Hidden backend controls (frontend uses fixed backend URL) -->
+      <div class="controls" style="display:none">
+        <input id="backend-url" type="hidden" value="http://localhost:8000" />
+        <button id="refresh-history" style="display:none">Load history</button>
+      </div>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <div class="composer">
+        <textarea id="input" placeholder="Write a message..." aria-label="Message input"></textarea>
+        <button id="send">Send</button>
+      </div>
+    </div>
+
+    <footer>
+      <small>Made by <code>Muhammad Zeeshan</code></small>
+    </footer>
+  </main>
+
+  <script>
+    // Utilities
+    const $ = s => document.querySelector(s);
+  const messagesEl = $('#messages');
+  const inputEl = $('#input');
+  const sendBtn = $('#send');
+  // Use a fixed backend URL (hidden from UI)
+  const BACKEND_URL = 'http://localhost:8000';
+
+    function scrollToBottom(){
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function makeMessage(text, type='bot'){
+      const el = document.createElement('div');
+      el.className = 'message ' + (type === 'user' ? 'user' : 'bot');
+      el.textContent = text;
+      return el;
+    }
+
+    function appendUser(text){
+      const m = makeMessage(text,'user');
+      messagesEl.appendChild(m);
+      scrollToBottom();
+    }
+    function appendBot(text){
+      const m = makeMessage(text,'bot');
+      messagesEl.appendChild(m);
+      scrollToBottom();
+    }
+
+    function showError(msg){
+      const el = document.createElement('div');
+      el.className = 'message bot';
+      el.style.background = 'linear-gradient(135deg,#f97316,#fb923c)';
+      el.textContent = msg;
+      messagesEl.appendChild(el);
+      scrollToBottom();
+    }
+
+    // Load /history and populate messages
+    async function loadHistory(){
+  const base = BACKEND_URL;
+      try{
+        const res = await fetch(base + '/history');
+        if(!res.ok){
+          const t = await res.text();
+          throw new Error('Failed to load history: ' + t);
+        }
+        const history = await res.json();
+        messagesEl.innerHTML = '';
+        // history is an array of entries: show each as user -> bot
+        history.forEach(entry => {
+          if(entry.user_query){
+            messagesEl.appendChild(makeMessage(entry.user_query,'user'));
+          }
+          if(entry.gemini_response){
+            messagesEl.appendChild(makeMessage(entry.gemini_response,'bot'));
+          }
+        });
+        scrollToBottom();
+      }catch(err){
+        messagesEl.innerHTML = '';
+        showError('Could not load history: ' + err.message);
+      }finally{
+        // no-op (controls hidden)
+      }
+    }
+
+    // Send message to /chat
+    async function sendMessage(){
+      const text = inputEl.value.trim();
+      if(!text) return;
+  const base = BACKEND_URL;
+  if(!base) return showError('Backend URL not set');
+
+      // Add user message immediately
+      appendUser(text);
+      inputEl.value = '';
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+
+      try{
+        const res = await fetch(base + '/chat', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({user_query: text})
+        });
+        if(!res.ok){
+          const contentType = res.headers.get('content-type') || '';
+          let body = await res.text();
+          try{ if(contentType.includes('application/json')) body = JSON.parse(body).detail || JSON.stringify(JSON.parse(body)); }catch(e){}
+          throw new Error(body || res.statusText);
+        }
+        const data = await res.json();
+        const reply = data.gemini_response || '';
+        appendBot(reply);
+      }catch(err){
+        showError('Failed to send message: ' + err.message);
+      }finally{
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+      }
+    }
+
+    // Event listeners
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  // refresh button and backend input are hidden; load history automatically
+    // Load history on start
+    window.addEventListener('load', ()=>{
+      loadHistory();
+      inputEl.focus();
+    });
+  </script>
+</body>
+</html>

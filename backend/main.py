@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from backend.database.database import fetch_all_history, init_database, save_chat_entry
 from backend.schemas.chat import ChatHistoryEntry, ChatResponse, ChatRequest
 from backend.gemini.gemini import call_gemini_api
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(dotenv_path='../.env.local')
 
@@ -17,6 +18,24 @@ app = FastAPI(
     title='Chatbot using Gemini and FastAPI',
     description='A FastAPI application that integrates with Gemini for chatbot functionalities.',
     version='0.0.1'
+)
+
+# Allow the frontend (running on different origin) to call the API from the browser.
+# For local development we allow common localhost ports and file servers. In
+# production limit origins to your deployed frontend host.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8501",
+        "http://127.0.0.1:8501",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.on_event('startup')
